@@ -3,17 +3,15 @@ title: Analiza procesu zmniejszania siê d³ugoœci œledzi oceanicznych wy³awianych
   Europie
 author: "Micha³ KuŸma"
 date: "`r format(Sys.time(), '%d %B, %Y')`"
-output: html_document
+output: 
+  html_document: 
+    keep_md: yes
 ---
+
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-```
-
-```{r libraries}
-library(knitr)
-library(dplyr)
-library(tidyr)
+set.seed(23)
 ```
 
 ## Streszczenie wyników analizy
@@ -21,6 +19,19 @@ library(tidyr)
 
 ## Biblioteki wykorzystane do wygenerowania raportu
 
+Do wygenerowania raportu wykorzystano nastêpuj¹ce biblioteki:
+
+```{r libraries, warning=FALSE, message=FALSE}
+# Pisanie sprawozdania
+library(knitr)
+# Analiza danych
+library(plyr)
+library(dplyr)
+# Porz¹dkowanie danych
+library(tidyr)
+# Wykresy
+library(ggplot2)
+```
 
 ## Wczytywanie danych z pliku
 
@@ -30,9 +41,47 @@ sledzie <- read.csv("sledzie.csv", comment.char = "",
                     col.names = c("id", "length", "cfin1", "cfin2", "chel1", "chel2", "lcop1", "lcop2", "fbar", "recr", "cumf", "totaln", "sst", "sal", "xmonth", "nao"))
 ```
 
+## Przetwarzanie brakuj¹cych danych
+
+W pierwszej kolejnoœci przeprowadzono analizê danych maj¹c¹ na celu oszacowanie ich "czystoœci, a wiêc liczby pól o nieznanej wartoœci (NA). Poni¿ej znajduje siê podsumowanie wczytanych danych.
+
+```{r raw_data_summary}
+  kable(summary(sledzie %>% select(id:lcop2)))
+kable(summary(sledzie %>% select(fbar:nao)))
+```
+
+Jak widaæ w powy¿szym zestawieniu, danych brakuje w kolumnach: *cfin1*, *cfin2*, *chel1*, *chel2*, *lcop1*, *lcop2* i *sst*. S¹ to dane opisuj¹ce dostêpnoœæ planktonu (pierwsze 6 z wymienionych kolumn) i temperaturê przy powierzchni wody. Poniewa¿ dane te s¹ silnie ze sob¹ powi¹zane (s¹ sta³e dla danego po³owu), brakuj¹ce wartoœci zast¹piono danymi z podobnych wierszy (obserwacji z tego samego po³owu okreœlonego przez numer miesi¹ca i ca³kowit¹ liczbê z³owionych ryb).
+
+```{r data_cleaning, cache=TRUE, message = FALSE}
+impute.mean <- function(x) replace(x, is.na(x), mean(x, na.rm = TRUE))
+data <- ddply(sledzie, .(totaln), transform, 
+                       cfin1 = impute.mean(cfin1),
+                       cfin2 = impute.mean(cfin2),
+                       chel1 = impute.mean(chel1),
+                       chel2 = impute.mean(chel2),
+                       lcop1 = impute.mean(lcop1),
+                       lcop2 = impute.mean(lcop2),
+                       sst = impute.mean(sst))
+```
+
 ## Podsumowanie danych
+
+```{r clean_data_summary}
+  kable(summary(data %>% select(id:lcop2)))
+  kable(summary(data %>% select(fbar:nao)))
+```
+
 ```{r data_summary, echo=FALSE}
-kable(summary(sledzie))
+
+
+# kable(summary(sledzie))
+# 
+# ggplot(sledzie, aes(x = id, y = length)) +
+#   geom_point() +
+#   ggtitle("D³ugoœæ ³owionego œledzia na przestrzeni czasu") +
+#   xlab("Numer pomiaru") +
+#   ylab("D³ugoœæ œledzia") +
+#   theme_bw()
 
 
 # kable(head(sledzie, n = 10000))
