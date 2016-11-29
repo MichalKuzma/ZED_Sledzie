@@ -1,0 +1,45 @@
+---
+title: Analiza procesu zmniejszania siê d³ugoœci œledzi oceanicznych wy³awianych w
+  Europie
+author: "Micha³ KuŸma"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r libraries}
+library(knitr)
+library(dplyr)
+library(tidyr)
+```
+
+## Streszczenie wyników analizy
+
+
+## Biblioteki wykorzystane do wygenerowania raportu
+
+
+## Wczytywanie danych z pliku
+
+```{r data_load}
+sledzie <- read.csv("sledzie.csv", comment.char = "",
+                    na.strings = "?",
+                    col.names = c("id", "length", "cfin1", "cfin2", "chel1", "chel2", "lcop1", "lcop2", "fbar", "recr", "cumf", "totaln", "sst", "sal", "xmonth", "nao"))
+```
+
+## Podsumowanie danych
+```{r data_summary, echo=FALSE}
+kable(summary(sledzie))
+
+
+# kable(head(sledzie, n = 10000))
+
+# kable(sledzie %>%
+#   na.omit() %>%
+#   group_by(xmonth, cfin1, cfin2, chel1, chel2, lcop1, lcop2, sst) %>%
+#   summarise(counter = n(), x = mean(id)) %>%
+#   arrange(xmonth, x))
+```
