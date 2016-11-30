@@ -31,6 +31,10 @@ library(dplyr)
 library(tidyr)
 # Wykresy
 library(ggplot2)
+library(plotly)
+library(GGally)
+# Regresja
+library(caret)
 ```
 
 ## Wczytywanie danych z pliku
@@ -47,7 +51,7 @@ W pierwszej kolejnoœci przeprowadzono analizê danych maj¹c¹ na celu oszacowanie 
 
 ```{r raw_data_summary}
   kable(summary(sledzie %>% select(id:lcop2)))
-kable(summary(sledzie %>% select(fbar:nao)))
+  kable(summary(sledzie %>% select(fbar:nao)))
 ```
 
 Jak widaæ w powy¿szym zestawieniu, danych brakuje w kolumnach: *cfin1*, *cfin2*, *chel1*, *chel2*, *lcop1*, *lcop2* i *sst*. S¹ to dane opisuj¹ce dostêpnoœæ planktonu (pierwsze 6 z wymienionych kolumn) i temperaturê przy powierzchni wody. Poniewa¿ dane te s¹ silnie ze sob¹ powi¹zane (s¹ sta³e dla danego po³owu), brakuj¹ce wartoœci zast¹piono danymi z podobnych wierszy (obserwacji z tego samego po³owu okreœlonego przez numer miesi¹ca i ca³kowit¹ liczbê z³owionych ryb).
@@ -66,29 +70,174 @@ data <- ddply(sledzie, .(totaln), transform,
 
 ## Podsumowanie danych
 
+Oczyszczony zbiór danych sk³ada siê z `r nrow(data)` obserwacji opisanych przez `r ncol(data)` atrybutów. Jego statystyki zamieszczono poni¿ej.
+
+
 ```{r clean_data_summary}
   kable(summary(data %>% select(id:lcop2)))
   kable(summary(data %>% select(fbar:nao)))
 ```
 
-```{r data_summary, echo=FALSE}
+Dla ka¿dego atrybutu stworzono wykres obrazuj¹cy, jakie wartoœci przyjmowa³ na przestrzeni kolejnych po³owów.
 
+Dostêpnoœæ wszystkich szeœciu gatunków planktonu zobrazowano na jednym wykresie, aby u³atwiæ zaobserwowanie korelacji pomiêdzy atrybutami.
 
-# kable(summary(sledzie))
-# 
-# ggplot(sledzie, aes(x = id, y = length)) +
-#   geom_point() +
-#   ggtitle("D³ugoœæ ³owionego œledzia na przestrzeni czasu") +
-#   xlab("Numer pomiaru") +
-#   ylab("D³ugoœæ œledzia") +
-#   theme_bw()
+```{r plankton_analysis, message=FALSE, warning=FALSE}
+plankton_data <- data %>%
+  select(id, cfin1:lcop2) %>%
+  gather(plankton_name, plankton_density, cfin1:lcop2) %>%
+  mutate(plankton_name = replace(plankton_name, plankton_name == "cfin1", "Calanus finmarchicus gat. 1 (cfin1)")) %>%
+  mutate(plankton_name = replace(plankton_name, plankton_name == "cfin2", "Calanus finmarchicus gat. 2 (cfin2)")) %>%
+  mutate(plankton_name = replace(plankton_name, plankton_name == "chel1", "Calanus helgolandicus gat. 1 (chel1)")) %>%
+  mutate(plankton_name = replace(plankton_name, plankton_name == "chel2", "Calanus helgolandicus gat. 2 (chel2)")) %>%
+  mutate(plankton_name = replace(plankton_name, plankton_name == "lcop1", "Wid³onogi gat. 1 (lcop1)")) %>%
+  mutate(plankton_name = replace(plankton_name, plankton_name == "lcop2", "Wid³onogi gat. 1 (lcop2)"))
 
+cfin1Plot <- ggplot(plankton_data, aes(x=id, y=plankton_density, color = plankton_name)) + 
+              geom_smooth() + 
+              theme_light() + 
+              ggtitle("Dostêpnoœæ planktonu") +
+              xlab("Po³ów") + 
+              ylab("Zagêszczenie planktonu")
+ggplotly(cfin1Plot)
+```
 
-# kable(head(sledzie, n = 10000))
+```{r fbar_analysis, message=FALSE, warning=FALSE}
+fbarPlot <- ggplot(sledzie, aes(x=id, y=fbar)) + 
+              geom_smooth() + 
+              theme_light() + 
+              ggtitle("Natê¿enie po³owów w regionie") +
+              xlab("Po³ów") + 
+              ylab("U³amek pozostawionego narybku")
+ggplotly(fbarPlot)
+```
 
-# kable(sledzie %>%
-#   na.omit() %>%
-#   group_by(xmonth, cfin1, cfin2, chel1, chel2, lcop1, lcop2, sst) %>%
-#   summarise(counter = n(), x = mean(id)) %>%
-#   arrange(xmonth, x))
+```{r recr_analysis, message=FALSE, warning=FALSE}
+recrPlot <- ggplot(sledzie, aes(x=id, y=recr)) + 
+              geom_smooth() + 
+              theme_light() + 
+              ggtitle("Roczny narybek") +
+              xlab("Po³ów") + 
+              ylab("Liczba œledzi")
+ggplotly(recrPlot)
+```
+
+```{r cumf_analysis, message=FALSE, warning=FALSE}
+cumfPlot <- ggplot(sledzie, aes(x=id, y=cumf)) + 
+              geom_smooth() + 
+              theme_light() + 
+              ggtitle("£¹czne roczne natê¿enie po³owów w regionie") +
+              xlab("Po³ów") + 
+              ylab("U³amek pozostawionego narybku")
+ggplotly(cumfPlot)
+```
+
+```{r totaln_analysis, message=FALSE, warning=FALSE}
+totalnPlot <- ggplot(sledzie, aes(x=id, y=totaln)) + 
+              geom_smooth() + 
+              theme_light() + 
+              ggtitle("£¹czna liczba ryb z³owionych w ramach po³owu") +
+              xlab("Po³ów") + 
+              ylab("Liczba œledzi")
+ggplotly(totalnPlot)
+```
+
+```{r sst_analysis, message=FALSE, warning=FALSE}
+sstPlot <- ggplot(sledzie, aes(x=id, y=sst)) + 
+              geom_smooth() + 
+              theme_light() +
+              ggtitle("Temperatura przy powierzchni wody") +
+              xlab("Po³ów") + 
+              ylab("Temperatura [°C]")
+ggplotly(sstPlot)
+```
+
+```{r sal_analysis, message=FALSE, warning=FALSE}
+salPlot <- ggplot(sledzie, aes(x=id, y=sal)) + 
+              geom_smooth() + 
+              theme_light() +
+              ggtitle("Poziom zasolenia wody") +
+              xlab("Po³ów") + 
+              ylab("Poziom zasolenia [Knudsen ppt]")
+ggplotly(salPlot)
+```
+
+```{r nao_analysis, message=FALSE, warning=FALSE}
+naoPlot <- ggplot(sledzie, aes(x=id, y=nao)) + 
+              geom_smooth() + 
+              theme_light() +
+              ggtitle("Oscylacja pó³nocnoatlantycka") +
+              xlab("Po³ów") + 
+              ylab("Oscylacja pó³nocnoatlantycka [mb]")
+ggplotly(naoPlot)
+```
+
+## Analiza korelacji miêdzy atrybutami
+
+Przeprowadzono analizê korelacji atrybutów opisuj¹cych dostêpnoœæ poszczególnych gatunków planktonu.
+
+```{r plankton_correlation_analysis}
+data %>%
+  select(cfin1:lcop2) %>%
+  ggpairs() +
+  theme_bw()
+```
+
+Wspó³czynniki korelacji potwierdzaj¹ zaobserwowan¹ wczeœniej zale¿noœæ miêdzy parami parametrów *lcop1* i *chel1* oraz *lcop2* i *chel2*. Ze zbioru danych usuniêto parametry *chel1* i *chel2*, z powodu zaobserwowanej korelacji.
+
+```{r data_plankton_update}
+data <- data %>%
+  select(-chel1, -chel2)
+```
+
+```{r other_correlation_analysis}
+data %>%
+  select(fbar:sal, nao) %>%
+  ggpairs() +
+  theme_bw()
+```
+
+Wysoki wspó³czynnik korelacji dla atrybutów cfin1 i *fbar* (natê¿enie po³owów w regionie) i *cumf* (³¹czne roczne natê¿enie po³owów w regionie) jest zgodny z intuicj¹, która podpowiada, ¿e ³¹czne roczne po³owy by³y wysokie wówczas, gdy miesiêczne natê¿enie po³owów równie¿ by³o wysokie. Podobnie zauwa¿alna ujemna korelacja parametrów *totaln* (³¹czna liczba ryb z³owionych w ramach po³owu) i *cumf* wydaje siê byæ intuicyjna. Wraz ze wzrostem liczby z³owionych œledzi maleje u³amek pozostawionego narybku. W konsekwencji zaobserwowanych korelacji usuniêto ze zbioru danych parametr *cumf*. Dla pozosta³ych par atrybutów nie zaobserwowano istotnej korelacji.
+
+```{r data_other_update}
+data <- data %>%
+  select(-cumf)
+```
+
+Po zakoñczonej analizie i wykluczeniu ze zbioru danych parametrów skorelowanych z innymi, obserwacje opisane s¹ `r ncol(data)` parametrami.
+
+## Zmiana rozmiaru œledzia w czasie
+
+```{r length_analysis, message=FALSE, warning=FALSE}
+lengthPlot <- ggplot(sledzie, aes(x=id, y=length)) + 
+              geom_smooth() + 
+              theme_light() + 
+              ggtitle("D³ugoœæ z³owionego œledzia") + 
+              xlab("Po³ów") + 
+              ylab("D³ugoœæ œledzia [cm]")
+ggplotly(lengthPlot)
+```
+
+## Regresor przewiduj¹cy rozmiar œledzia
+
+Zbiór danych zosta³ podzielony na dane ucz¹ce, waliduj¹ce i testowe w proporcjach 14:3:3.
+
+```{r regression}
+splitSample <- sample(1:3, size = nrow(data), prob = c(0.7, 0.15, 0.15), replace = TRUE)
+training <- data[splitSample == 1,]
+validation <- data[splitSample == 2,]
+testing <- data[splitSample == 3,]
+
+ctrl <- trainControl(
+  method = "repeatedcv",
+  number = 2,
+  repeats = 5)
+
+fit <- train(length ~ .,
+             data = training,
+             method = "rf",
+             trControl = ctrl,
+             ntree = 10)
+
+print(fit)
 ```
