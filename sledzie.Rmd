@@ -13,18 +13,18 @@ output:
 
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
-set.seed(23)
+knitr::opts_chunk$set(echo = FALSE)
 ```
 
 # Streszczenie wyników analizy
 
+Dane przedstawiaj¹ zmniejszaj¹c¹ siê w czasie d³ugoœæ ³owionych œledzi w Europie. Po wyczyszczeniu danych i przeprowadzeniu analizy zauwa¿ono silny wp³yw temperatury przy powierzchni wody na rozmiar ³owionego œledzia (im wy¿sza temperatura, tym mniejszy œledŸ). S³absze pozytywne korelacje zauwa¿ono w stosunku do atrybutów opisuj¹cych zagêszczenie wid³ogonów i planktonu *Calanus helgolandicus gatunku pierwszego*, oraz u³amek pozostawionego w regionie narybku. Oscylacja pó³nocnoatlantycka zdaje siê negatywnie wp³ywaæ na rozmiary ³owionych œledzi (im wiêksza wartoœæ oscylacji, tym mniejsza ryba).
 
 # Biblioteki wykorzystane do wygenerowania raportu
 
 Do wygenerowania raportu wykorzystano nastêpuj¹ce biblioteki:
 
-```{r libraries, warning=FALSE, message=FALSE}
+```{r libraries, echo = TRUE, warning=FALSE, message=FALSE}
 # Pisanie sprawozdania
 library(knitr)
 # Analiza danych
@@ -36,13 +36,18 @@ library(tidyr)
 library(ggplot2)
 library(plotly)
 library(GGally)
+# Macierz korelacji
+library(corrplot)
 # Regresja
 library(caret)
 ```
 
 # Wczytywanie danych z pliku
 
-```{r data_load}
+```{r data_load, echo = TRUE}
+# Ustawienie ziarna zapewnia powtarzalnoœæ wyników
+set.seed(23)
+
 sledzie <- read.csv("sledzie.csv", comment.char = "",
                     na.strings = "?",
                     col.names = c("id", "length", "cfin1", "cfin2", "chel1", "chel2", "lcop1", "lcop2", "fbar", "recr", "cumf", "totaln", "sst", "sal", "xmonth", "nao"))
@@ -50,16 +55,22 @@ sledzie <- read.csv("sledzie.csv", comment.char = "",
 
 # Przetwarzanie brakuj¹cych danych
 
-W pierwszej kolejnoœci przeprowadzono analizê danych maj¹c¹ na celu oszacowanie ich "czystoœci, a wiêc liczby pól o nieznanej wartoœci (NA). Poni¿ej znajduje siê podsumowanie wczytanych danych.
+W pierwszej kolejnoœci przeprowadzono analizê danych maj¹c¹ na celu oszacowanie ich "czystoœci, a wiêc liczby pól o nieznanej wartoœci (NA). Poni¿ej znajduje siê podsumowanie liczby brakuj¹cych wartoœci we wczytanych danych (kolumny bez brakuj¹cych wartoœci nie zosta³y uwzglêdnione na wykresie).
 
 ```{r raw_data_summary}
-  kable(summary(sledzie %>% select(id:lcop2)))
-  kable(summary(sledzie %>% select(fbar:nao)))
+naCount <- sledzie %>%
+  gather("column", "value", 1:ncol(sledzie)) %>%
+  filter(is.na(value))
+
+ggplot(naCount, aes(factor(column))) +
+  geom_bar() +
+  labs(title = "Liczba brakuj¹cych wartoœci w kolumnie", x = "Kolumna", y = "Liczba brakuj¹cych wartoœci") + 
+  theme_bw()
 ```
 
 Jak widaæ w powy¿szym zestawieniu, danych brakuje w kolumnach: *cfin1*, *cfin2*, *chel1*, *chel2*, *lcop1*, *lcop2* i *sst*. S¹ to dane opisuj¹ce dostêpnoœæ planktonu (pierwsze 6 z wymienionych kolumn) i temperaturê przy powierzchni wody. Poniewa¿ dane te s¹ silnie ze sob¹ powi¹zane (s¹ sta³e dla danego po³owu), brakuj¹ce wartoœci zast¹piono danymi z podobnych wierszy (obserwacji z tego samego po³owu okreœlonego przez numer miesi¹ca i ca³kowit¹ liczbê z³owionych ryb).
 
-```{r data_cleaning, cache=TRUE, message = FALSE}
+```{r data_cleaning, echo = TRUE, cache=TRUE, message = FALSE}
 impute.mean <- function(x) replace(x, is.na(x), mean(x, na.rm = TRUE))
 data <- ddply(sledzie, .(totaln), transform, 
                        cfin1 = impute.mean(cfin1),
@@ -177,37 +188,23 @@ ggplotly(naoPlot)
 
 # Analiza korelacji miêdzy atrybutami
 
-Przeprowadzono analizê korelacji atrybutów opisuj¹cych dostêpnoœæ poszczególnych gatunków planktonu.
-
-```{r plankton_correlation_analysis}
-data %>%
-  select(cfin1:lcop2) %>%
-  ggpairs() +
-  theme_bw()
+```{r correlation_analysis}
+M <- cor(data %>% select(-id))
+corrplot(M, method="number")
 ```
 
 Wspó³czynniki korelacji potwierdzaj¹ zaobserwowan¹ wczeœniej zale¿noœæ miêdzy parami parametrów *lcop1* i *chel1* oraz *lcop2* i *chel2*. Ze zbioru danych usuniêto parametry *chel1* i *chel2*, z powodu zaobserwowanej korelacji.
 
-```{r data_plankton_update}
-data <- data %>%
-  select(-chel1, -chel2)
-```
-
-```{r other_correlation_analysis}
-data %>%
-  select(fbar:sal, nao) %>%
-  ggpairs() +
-  theme_bw()
-```
-
 Wysoki wspó³czynnik korelacji dla atrybutów cfin1 i *fbar* (natê¿enie po³owów w regionie) i *cumf* (³¹czne roczne natê¿enie po³owów w regionie) jest zgodny z intuicj¹, która podpowiada, ¿e ³¹czne roczne po³owy by³y wysokie wówczas, gdy miesiêczne natê¿enie po³owów równie¿ by³o wysokie. Podobnie zauwa¿alna ujemna korelacja parametrów *totaln* (³¹czna liczba ryb z³owionych w ramach po³owu) i *cumf* wydaje siê byæ intuicyjna. Wraz ze wzrostem liczby z³owionych œledzi maleje u³amek pozostawionego narybku. W konsekwencji zaobserwowanych korelacji usuniêto ze zbioru danych parametr *cumf*. Dla pozosta³ych par atrybutów nie zaobserwowano istotnej korelacji.
 
-```{r data_other_update}
+```{r data_update}
 data <- data %>%
-  select(-cumf)
+  select(-chel1, -chel2, -cumf)
 ```
 
 Po zakoñczonej analizie i wykluczeniu ze zbioru danych parametrów skorelowanych z innymi, obserwacje opisane s¹ `r ncol(data)` parametrami.
+
+Do oszacowania d³ugoœci œledzia istotny wydaje siê byæ atrybut *sst* (znaczna ujemna korelacja), oraz w mniejszym stopniu atrybuty *lcop1*, *fbar* i *nao*.
 
 # Zmiana rozmiaru œledzia w czasie
 
@@ -226,10 +223,12 @@ ggplotly(lengthPlot)
 Zbiór danych zosta³ podzielony na dane ucz¹ce, waliduj¹ce i testowe w proporcjach 14:3:3.
 
 ```{r regression, message=FALSE, warning=FALSE}
-splitSample <- sample(1:3, size = nrow(data), prob = c(0.7, 0.15, 0.15), replace = TRUE)
-training <- data[splitSample == 1,]
-validation <- data[splitSample == 2,]
-testing <- data[splitSample == 3,]
+inTraining <- createDataPartition(
+  y = data$length,
+  p = .7,
+  list = FALSE)
+training <- data[inTraining, ] %>% select(-id)
+testing <- data[-inTraining, ]
 
 ctrl <- trainControl(
   method = "repeatedcv",
@@ -242,5 +241,33 @@ fit <- train(length ~ .,
              trControl = ctrl,
              ntree = 10)
 
-print(fit)
+x_test = testing %>% select(-length, -id)
+
+predictions <- predict(fit, x_test)
+```
+
+Stworzono regresor przewiduj¹cy d³ugoœæ z³owionego œledzia na podstawie pozosta³ych parametrów. Trafnoœæ regresora:
+
+`r kable(fit$results)`
+
+Przewidziane rozmiary œledzi dla zbioru testowego przedstawiono na poni¿szych wykresach.
+
+```{r regression_graphs, message=FALSE, warning=FALSE}
+test_df <- data.frame(id = testing$id, test_value = testing$length, prediction = predictions) %>%
+  gather("type", "value", test_value:prediction) %>%
+  mutate(type = replace(type, type == "prediction", "Wartoœæ przewidziana przez regresor")) %>%
+  mutate(type = replace(type, type == "test_value", "Wartoœæ rzeczywista"))
+
+ggplot(test_df, aes(x = id, y = value)) +
+  geom_point() +
+  ggtitle("Porównanie wartoœci przewidzianych z rzeczywistymi") +
+  xlab("Numer po³owu") +
+  ylab("D³ugoœæ œledzia") +
+  facet_grid(. ~ type) +
+  theme_bw()
+
+ggplot(test_df, aes(x = id, y = value, color = type)) +
+  geom_smooth() +
+  labs(title = "Porównanie wartoœci przewidzianych z rzeczywistymi", x = "Numer po³owu", y = "D³ugoœæ œledzia", col = "¯ród³o wartoœci") + 
+  theme_bw()
 ```
