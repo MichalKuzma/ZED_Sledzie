@@ -6,6 +6,9 @@ date: "`r format(Sys.time(), '%d %B, %Y')`"
 output: 
   html_document: 
     keep_md: yes
+    number_sections: yes
+    toc: yes
+    toc_float: yes
 ---
 
 
@@ -14,10 +17,10 @@ knitr::opts_chunk$set(echo = TRUE)
 set.seed(23)
 ```
 
-## Streszczenie wyników analizy
+# Streszczenie wyników analizy
 
 
-## Biblioteki wykorzystane do wygenerowania raportu
+# Biblioteki wykorzystane do wygenerowania raportu
 
 Do wygenerowania raportu wykorzystano nastêpuj¹ce biblioteki:
 
@@ -37,7 +40,7 @@ library(GGally)
 library(caret)
 ```
 
-## Wczytywanie danych z pliku
+# Wczytywanie danych z pliku
 
 ```{r data_load}
 sledzie <- read.csv("sledzie.csv", comment.char = "",
@@ -45,7 +48,7 @@ sledzie <- read.csv("sledzie.csv", comment.char = "",
                     col.names = c("id", "length", "cfin1", "cfin2", "chel1", "chel2", "lcop1", "lcop2", "fbar", "recr", "cumf", "totaln", "sst", "sal", "xmonth", "nao"))
 ```
 
-## Przetwarzanie brakuj¹cych danych
+# Przetwarzanie brakuj¹cych danych
 
 W pierwszej kolejnoœci przeprowadzono analizê danych maj¹c¹ na celu oszacowanie ich "czystoœci, a wiêc liczby pól o nieznanej wartoœci (NA). Poni¿ej znajduje siê podsumowanie wczytanych danych.
 
@@ -68,7 +71,7 @@ data <- ddply(sledzie, .(totaln), transform,
                        sst = impute.mean(sst))
 ```
 
-## Podsumowanie danych
+# Podsumowanie danych
 
 Oczyszczony zbiór danych sk³ada siê z `r nrow(data)` obserwacji opisanych przez `r ncol(data)` atrybutów. Jego statystyki zamieszczono poni¿ej.
 
@@ -172,7 +175,7 @@ naoPlot <- ggplot(sledzie, aes(x=id, y=nao)) +
 ggplotly(naoPlot)
 ```
 
-## Analiza korelacji miêdzy atrybutami
+# Analiza korelacji miêdzy atrybutami
 
 Przeprowadzono analizê korelacji atrybutów opisuj¹cych dostêpnoœæ poszczególnych gatunków planktonu.
 
@@ -206,7 +209,7 @@ data <- data %>%
 
 Po zakoñczonej analizie i wykluczeniu ze zbioru danych parametrów skorelowanych z innymi, obserwacje opisane s¹ `r ncol(data)` parametrami.
 
-## Zmiana rozmiaru œledzia w czasie
+# Zmiana rozmiaru œledzia w czasie
 
 ```{r length_analysis, message=FALSE, warning=FALSE}
 lengthPlot <- ggplot(sledzie, aes(x=id, y=length)) + 
@@ -218,11 +221,11 @@ lengthPlot <- ggplot(sledzie, aes(x=id, y=length)) +
 ggplotly(lengthPlot)
 ```
 
-## Regresor przewiduj¹cy rozmiar œledzia
+# Regresor przewiduj¹cy rozmiar œledzia
 
 Zbiór danych zosta³ podzielony na dane ucz¹ce, waliduj¹ce i testowe w proporcjach 14:3:3.
 
-```{r regression}
+```{r regression, message=FALSE, warning=FALSE}
 splitSample <- sample(1:3, size = nrow(data), prob = c(0.7, 0.15, 0.15), replace = TRUE)
 training <- data[splitSample == 1,]
 validation <- data[splitSample == 2,]
